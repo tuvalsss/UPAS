@@ -25,8 +25,8 @@ from typing import Literal
 _KELLY_FRACTION = float(os.getenv("KELLY_FRACTION", "0.25"))
 _MAX_TRADE_EQUITY_PCT = float(os.getenv("MAX_TRADE_EQUITY_PCT", "0.08"))
 _MAX_SINGLE_TRADE_USD_BASE = float(os.getenv("MAX_SINGLE_TRADE_USD", "25"))
-_MIN_SIZE_USD_POLY = 5.0   # Polymarket hard floor
-_MIN_SIZE_USD_KALSHI = 1.0 # Kalshi accepts 1c minimums
+_MIN_SIZE_USD_POLY = float(os.getenv("MIN_ENTRY_USD_POLY", "10"))    # raised from $5 floor to leave room for price drops before position becomes unsellable
+_MIN_SIZE_USD_KALSHI = float(os.getenv("MIN_ENTRY_USD_KALSHI", "1"))
 
 
 def _expected_edge(score: float, ai_confidence: float) -> float:
