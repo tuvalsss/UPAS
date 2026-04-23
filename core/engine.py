@@ -329,21 +329,30 @@ def run_pipeline(
             except Exception:
                 eq = 0.0
 
-            # Current open exposure for this exchange (from recent filled orders this day)
+            # Current NET open exposure (actual position value), not gross order flow
             try:
-                from tools.database_tool import _conn as _db
-                with _db() as _c:
-                    open_exp = float(_c.execute(
-                        "SELECT COALESCE(SUM(size_usd),0) FROM orders WHERE exchange=? AND dry_run=0 "
-                        "AND status='filled' AND timestamp>=datetime('now','-1 day')",
-                        (source,),
-                    ).fetchone()[0] or 0)
+                if source == "polymarket":
+                    from tools.account_tool import get_polymarket_positions as _gpp
+                    open_exp = float(_gpp().get("portfolio_value_usd", 0) or 0)
+                elif source == "kalshi":
+                    from tools.account_tool import get_kalshi_balance as _gkb
+                    open_exp = float(_gkb().get("positions_value_usd", 0) or 0)
+                else:
+                    open_exp = 0.0
             except Exception:
                 open_exp = 0.0
 
+            # Exposure cap = equity × EXPOSURE_MULTIPLIER (default 1.5x).
+            # With NET exposure tracking, 1.5x means we can hold positions
+            # worth 1.5x our cash — plenty for a prediction market book.
+            mult = float(os.getenv("EXPOSURE_MULTIPLIER", "1.5"))
+            max_exposure = float(os.getenv(
+                "MAX_TOTAL_EXPOSURE_USD", str(max(200.0, eq * mult))
+            ))
             sized = kelly_size_usd(
                 exchange=source, price=float(price), score=score,
                 ai_confidence=ai_conf, equity_usd=eq, open_exposure_usd=open_exp,
+                max_total_exposure_usd=max_exposure,
                 signal=sig,
             )
             size_usd = sized["size_usd"]

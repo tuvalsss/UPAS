@@ -44,7 +44,7 @@ _LB_LIMIT = int(os.getenv("SMART_MONEY_LB_LIMIT", "50"))
 _LB_WINDOW = os.getenv("SMART_MONEY_WINDOW", "MONTH")  # DAY|WEEK|MONTH|ALL
 _LB_REFRESH_SEC = int(os.getenv("SMART_MONEY_REFRESH_SEC", "21600"))  # 6h
 _MIN_PNL = float(os.getenv("SMART_MONEY_MIN_PNL", "10000"))   # min $10k lifetime PnL
-_MIN_WHALES = int(os.getenv("SMART_MONEY_MIN_WHALES", "3"))
+_MIN_WHALES = int(os.getenv("SMART_MONEY_MIN_WHALES", "2"))
 _MIN_WHALE_POS_USD = float(os.getenv("SMART_MONEY_MIN_POS_USD", "500"))
 _TIMEOUT = 15
 
@@ -98,23 +98,38 @@ def _index_whale_positions(wallets: list[dict]) -> dict[str, list[dict]]:
     """
     Build {condition_id+outcome: [whale_entry, ...]}
     Each whale_entry = {address, name, rank, pnl, size, value_usd, outcome}
+
+    Market-maker filter: a whale with positions on BOTH sides of the same
+    market is spreading (market-making), not betting directionally — skip
+    that whale for that market entirely.
     """
-    idx: dict[str, list[dict]] = {}
+    raw: dict[str, list[dict]] = {}
+    whale_market_sides: dict[tuple[str, str], set] = {}
     for w in wallets:
         positions = _fetch_whale_positions(w["address"])
         for p in positions:
-            cid = p.get("conditionId", p.get("condition_id", ""))
+            cid = (p.get("conditionId", p.get("condition_id", "")) or "").lower()
             outcome = p.get("outcome", "")
             value_usd = float(p.get("currentValue", p.get("value_usd", 0)) or 0)
             if not cid or not outcome or value_usd < _MIN_WHALE_POS_USD:
                 continue
-            key = f"{cid}::{outcome}"
-            idx.setdefault(key, []).append({
+            whale_market_sides.setdefault((w["address"], cid), set()).add(outcome)
+            raw.setdefault(f"{cid}::{outcome}", []).append({
                 "address": w["address"], "name": w["name"],
                 "rank": w["rank"], "pnl": w["pnl"],
                 "size": float(p.get("size", 0) or 0),
                 "value_usd": value_usd, "outcome": outcome,
             })
+
+    idx: dict[str, list[dict]] = {}
+    for key, entries in raw.items():
+        cid, _ = key.split("::", 1)
+        filtered = [
+            e for e in entries
+            if len(whale_market_sides.get((e["address"], cid), set())) == 1
+        ]
+        if filtered:
+            idx[key] = filtered
     return idx
 
 
