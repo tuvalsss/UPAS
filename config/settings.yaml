@@ -1,0 +1,72 @@
+# ── Risk & Capital ───────────────────────────────────────────
+capital: 1000.0
+risk_per_trade: 0.02
+
+# ── Scanning ─────────────────────────────────────────────────
+scan_interval_seconds: 60
+yes_price_min: 0.05
+yes_price_max: 0.95
+liquidity_min: 500
+expiry_hours_max: 168
+imbalance_threshold: 0.15
+
+# ── Reverse Strategy Thresholds ──────────────────────────────
+reverse_thresholds:
+  probability_freeze: 0.03
+  liquidity_vacuum: 200
+  crowd_fatigue: 0.6
+  whale_exhaustion: 0.8
+  fake_momentum: 0.4
+  event_shadow_drift: 0.05
+  mirror_event_divergence: 0.1
+  time_probability_inversion: 0.07
+
+# ── AI / ML / RL Feature Flags ───────────────────────────────
+ai_enabled: true
+ml_enabled: true
+rl_enabled: true
+
+# ── MCP / Subagent Integration ───────────────────────────────
+mcp_enabled: true
+skills_enabled: true
+subagents_enabled: true
+
+# ── Anthropic Models ─────────────────────────────────────────
+# "user" = claude CLI login session (free credits)
+# "api"  = ANTHROPIC_API_KEY from .env
+claude_auth_mode: user
+anthropic_model_standard: claude-sonnet-4-6
+anthropic_model_complex: claude-opus-4-7
+
+# ── Tool Reuse Policy ────────────────────────────────────────
+use_existing_tools_first: true
+
+# ── Checkpointing ────────────────────────────────────────────
+checkpoint_interval: 300      # seconds between auto-checkpoints
+
+# ── Logging ──────────────────────────────────────────────────
+log_level: INFO               # DEBUG | INFO | WARNING | ERROR | CRITICAL
+
+# ── Uncertainty / Reverse-Thinking ───────────────────────────
+ask_before_assuming: true
+uncertainty_threshold: 0.65
+reverse_mode_enabled: true
+fallback_to_user_question: true
+
+# ── Alerts ───────────────────────────────────────────────────
+alert_channels:
+  - console
+  # - telegram   # uncomment after setting TELEGRAM_BOT_TOKEN
+
+# ── Database ─────────────────────────────────────────────────
+database_path: data/upas.db
+checkpoint_path: data/checkpoints
+
+# ── Execution (Trading) ───────────────────────────────────────
+# dry_run: true = simulate orders only, false = place real orders
+dry_run: true
+max_single_trade_usd: 25.0
+max_position_usd: 100.0
+min_signal_score: 75.0       # minimum combined_score to execute
+min_confidence: 0.70          # minimum signal confidence to execute
+auto_execute: false            # true = autonomously route signals to execution

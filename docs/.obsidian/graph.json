@@ -1,0 +1,79 @@
+{
+  "collapse-filter": false,
+  "search": "",
+  "showTags": true,
+  "showAttachments": true,
+  "hideUnresolved": true,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "tag:#agent",
+      "color": {
+        "a": 1,
+        "rgb": 2179891
+      }
+    },
+    {
+      "query": "tag:#tool",
+      "color": {
+        "a": 1,
+        "rgb": 3342899
+      }
+    },
+    {
+      "query": "tag:#strategy",
+      "color": {
+        "a": 1,
+        "rgb": 16744272
+      }
+    },
+    {
+      "query": "tag:#module",
+      "color": {
+        "a": 1,
+        "rgb": 9699539
+      }
+    },
+    {
+      "query": "tag:#index",
+      "color": {
+        "a": 1,
+        "rgb": 16711680
+      }
+    },
+    {
+      "query": "tag:#architecture",
+      "color": {
+        "a": 1,
+        "rgb": 5701632
+      }
+    },
+    {
+      "query": "tag:#config",
+      "color": {
+        "a": 1,
+        "rgb": 8421504
+      }
+    },
+    {
+      "query": "tag:#reference",
+      "color": {
+        "a": 1,
+        "rgb": 6579300
+      }
+    }
+  ],
+  "collapse-display": false,
+  "showArrow": false,
+  "textFadeMultiplier": -0.4,
+  "nodeSizeMultiplier": 1.2,
+  "lineSizeMultiplier": 2.16003460207612,
+  "collapse-forces": false,
+  "centerStrength": 0.518,
+  "repelStrength": 14,
+  "linkStrength": 1,
+  "linkDistance": 250,
+  "scale": 0.7132754626224372,
+  "close": true
+}

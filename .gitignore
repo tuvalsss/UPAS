@@ -1,0 +1,87 @@
+# ── Secrets & credentials ────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.env
+config/kalshi_private_key.pem
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+secrets/
+.secrets/
+credentials.json
+
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+*.egg
+.installed.cfg
+lib/
+lib64/
+parts/
+var/
+sdist/
+wheels/
+share/python-wheels/
+
+# ── Virtual environments ─────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.env.bak
+
+# ── Data & database ─────────────────────────────────────────
+data/
+checkpoints/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+
+# ── Logs ─────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── ML artifacts ─────────────────────────────────────────────
+ml/models/
+rl/policies/
+*.pkl
+*.joblib
+*.model
+
+# ── IDE ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Obsidian workspace state ─────────────────────────────────
+docs/.obsidian/workspace.json
+docs/.obsidian/workspace-mobile.json
+docs/.obsidian/plugins/
+
+# ── Claude Code / agent state ────────────────────────────────
+.claude/
+memory/
+.claude-*/
+CLAUDE.local.md
+
+# ── Node (defensive) ─────────────────────────────────────────
+node_modules/
