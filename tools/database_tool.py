@@ -266,8 +266,8 @@ def insert_order(order: dict[str, Any]) -> None:
     sql = """
     INSERT OR REPLACE INTO orders
         (order_id, exchange, market_id, side, price, size_usd, status,
-         exchange_order_id, dry_run, error, timestamp)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+         exchange_order_id, dry_run, error, timestamp, paper_trade)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
     """
     with _conn() as con:
         con.execute(sql, (
@@ -276,6 +276,7 @@ def insert_order(order: dict[str, Any]) -> None:
             order["status"], order.get("exchange_order_id", ""),
             1 if order.get("dry_run", True) else 0,
             order.get("error"), order["timestamp"],
+            1 if order.get("paper_trade") else 0,
         ))
     logger.debug("db.insert_order", extra={"order_id": order["order_id"], "status": order["status"]})
 

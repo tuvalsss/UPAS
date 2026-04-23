@@ -319,17 +319,27 @@ def cmd_ask(args):
 
 def cmd_scorecard(_):
     """Per-strategy realized win-rate + PnL + current adaptive weight."""
-    from core.strategy_scorecard import scorecard, grand_total
+    from core.strategy_scorecard import scorecard, grand_total, paper_total
     from core.strategy_weights import list_all
     gt = grand_total()
+    pt = paper_total()
     console.print(Panel(
         f"Trades: [bold]{gt['trades']}[/]    "
         f"W/L: [green]{gt['wins']}[/]/[red]{gt['losses']}[/]    "
         f"Win rate: [bold]{gt['win_rate']*100:.1f}%[/]    "
         f"Total PnL: {'[green]' if gt['total_pnl_usd']>=0 else '[red]'}"
         f"${gt['total_pnl_usd']:+.2f}[/]",
-        title="Realized Outcomes", border_style="cyan",
+        title="Realized Outcomes (REAL money)", border_style="cyan",
     ))
+    if pt["trades"] > 0:
+        console.print(Panel(
+            f"Trades: [bold]{pt['trades']}[/]    "
+            f"W/L: [green]{pt['wins']}[/]/[red]{pt['losses']}[/]    "
+            f"Win rate: [bold]{pt['win_rate']*100:.1f}%[/]    "
+            f"Would-be PnL: {'[green]' if pt['total_pnl_usd']>=0 else '[red]'}"
+            f"${pt['total_pnl_usd']:+.2f}[/]",
+            title="Paper Trades (no real money)", border_style="yellow",
+        ))
     cards = scorecard()
     weights = {w["strategy"]: w for w in list_all()}
     t = Table(title="Per-Strategy Scorecard", show_lines=False)

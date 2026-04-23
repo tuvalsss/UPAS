@@ -1,6 +1,10 @@
 # Smart Money (Copy-Trade Whales) — Polymarket Only
 
-Proposed strategy at [strategies/proposed/smart_money.py](../../strategies/proposed/smart_money.py). **Not yet wired** to the core pipeline. Needs human review + paper-trade validation before promotion to `strategies/core/`.
+Strategy at [strategies/core/smart_money.py](../../strategies/core/smart_money.py) (origin at [strategies/proposed/smart_money.py](../../strategies/proposed/smart_money.py)).
+
+**Currently running in PAPER-TRADE mode.** Signals are generated, logged, and resolved by `outcome_tracker` — but `engine.py` skips real order placement because `smart_money` is listed in `tools/strategy_tool._PAPER_STRATEGIES`. Real capital is untouched.
+
+Paper results appear in `scorecard` under "Paper Trades (no real money)". Promote to real trading by removing `smart_money` from `_PAPER_STRATEGIES` once win rate ≥55% over ≥50 paper trades.
 
 ## Hypothesis
 
@@ -58,6 +62,20 @@ Free alternate data source — useful as backup or for richer endpoints:
 Base URL: `https://gzydspfquuaudqeztorw.supabase.co/functions/v1/public-api`
 Auth: `api_key` query param or `x-api-key` header. Request a key at polymarketscan.org.
 
+## Wallet cross-reference (`core/wallet_registry.py`)
+
+Before a wallet qualifies as "smart money", it is cross-referenced across **all four Polymarket leaderboard windows** (DAY, WEEK, MONTH, ALL). Only wallets that appear in the top-100 of at least 2 windows count. This filters one-week luck from durable alpha.
+
+`smart_wallets` table columns: `address, name, x_username, pnl_{day,week,month,all}, rank_{day,week,month,all}, consistency (1-4), verified_badge, last_refreshed`.
+
+Refreshed every 6 hours by `smart_money.detect()`. Override via `WALLET_REGISTRY_REFRESH_SEC`, `WALLET_REGISTRY_MIN_PNL`, `WALLET_REGISTRY_MIN_CONSISTENCY`.
+
+Inspect live:
+```bash
+python -m core.wallet_registry
+```
+Example output from a recent run: 127 raw whales → 51 verified (≥2 windows) → 3 hall-of-fame (all 4 windows): RN1 ($7.4M), 0x2a2C53 ($3.1M), gatorr ($2.1M).
+
 ## UPAS strategy logic
 
 Cached leaderboard (refresh every 6h), per-market clustering detection, score = 70 + 5*(whales_over_min) + rank_bonus. Environment tunables:
@@ -71,15 +89,14 @@ SMART_MONEY_MIN_WHALES=3       # clustering threshold
 SMART_MONEY_MIN_POS_USD=500    # ignore whale dust
 ```
 
-## Promotion checklist
+## Paper → Real promotion checklist
 
-Do NOT move to `strategies/core/` until:
-
-1. ✅ Run `python -m strategies.proposed.smart_money` and verify ≥1 live cluster.
-2. ⏳ Wire temporarily in DRY_RUN mode, collect 50+ signals.
-3. ⏳ After those 50 signals resolve, check win rate in scorecard ≥55%.
-4. ⏳ Add `"smart_money"` to `tools/strategy_tool._CORE_STRATEGIES`.
-5. ⏳ Update this doc → move to `docs/strategies/core/smart-money.md`.
+1. ✅ Wallet registry populated (≥50 consistent whales across windows).
+2. ✅ Wired in `_CORE_STRATEGIES` under `_PAPER_STRATEGIES` — signals generated, orders virtualised.
+3. ⏳ Wait for ≥50 paper signals to resolve in `results` table (where `paper_trade=1`).
+4. ⏳ Check `scorecard` paper row: win rate ≥55%, avg PnL positive.
+5. ⏳ Remove `"smart_money"` from `_PAPER_STRATEGIES` (keep in `_CORE_STRATEGIES`).
+6. ⏳ Move this file to `docs/strategies/core/smart-money.md`.
 
 ## Risks
 

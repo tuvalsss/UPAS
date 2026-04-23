@@ -44,6 +44,7 @@ def _ensure_schema():
             ("won", "INTEGER"),
             ("source", "TEXT"),
             ("token_id", "TEXT"),
+            ("paper_trade", "INTEGER"),
         ]:
             if col not in existing:
                 con.execute(f"ALTER TABLE results ADD COLUMN {col} {typ}")
@@ -95,15 +96,16 @@ def _resolve_outcome(condition_id: str, side: str) -> str | None:
 
 
 def _unresolved_poly_buys() -> list[dict]:
-    """Return Poly BUY orders that don't yet have a result row."""
+    """Return Poly BUY orders (real + paper) that don't yet have a result row."""
     with _conn() as con:
         con.row_factory = None  # tuples faster
         rows = con.execute("""
-            SELECT o.order_id, o.market_id, o.side, o.price, o.size_usd, o.timestamp
+            SELECT o.order_id, o.market_id, o.side, o.price, o.size_usd, o.timestamp,
+                   COALESCE(o.paper_trade, 0) AS paper_trade
             FROM orders o
             LEFT JOIN results r ON r.signal_id = o.order_id
             WHERE o.exchange='polymarket'
-              AND o.status='filled'
+              AND o.status IN ('filled','paper')
               AND o.dry_run=0
               AND LOWER(o.side) IN ('yes','no','buy')
               AND r.result_id IS NULL
@@ -112,7 +114,7 @@ def _unresolved_poly_buys() -> list[dict]:
         """, (_MIN_AGE_MIN,)).fetchall()
     return [
         {"order_id": r[0], "token_id": r[1], "side": r[2], "entry_price": r[3],
-         "size_usd": r[4], "timestamp": r[5]}
+         "size_usd": r[4], "timestamp": r[5], "paper_trade": r[6]}
         for r in rows
     ]
 
@@ -131,22 +133,24 @@ def _strategy_for_order(token_id: str, order_ts: str) -> str:
 def _record_result(order: dict, final_price: float, won: bool, strategy: str, source: str = "polymarket"):
     contracts = order["size_usd"] / max(0.01, order["entry_price"])
     pnl = round(contracts * (final_price - order["entry_price"]), 4)
+    paper = int(order.get("paper_trade", 0) or 0)
     with _conn() as con:
         con.execute("""
             INSERT INTO results
               (result_id, signal_id, market_id, realized_outcome, outcome_timestamp,
                strategy_name, side, entry_price, final_price, size_usd, pnl_usd, won,
-               source, token_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+               source, token_id, paper_trade)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             f"res-{order['order_id']}", order["order_id"], order["token_id"],
             1 if won else 0, datetime.now(timezone.utc).isoformat(),
             strategy, order["side"], order["entry_price"], final_price,
             order["size_usd"], pnl, 1 if won else 0, source, order["token_id"],
+            paper,
         ))
         con.commit()
     logger.info("outcome_tracker.recorded", extra={
-        "order_id": order["order_id"], "strategy": strategy,
+        "order_id": order["order_id"], "strategy": strategy, "paper": paper,
         "side": order["side"], "entry": order["entry_price"], "final": final_price,
         "pnl_usd": pnl, "won": won,
     })

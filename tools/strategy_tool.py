@@ -23,7 +23,20 @@ _CORE_STRATEGIES = [
     "yes_no_imbalance", "cross_market", "cross_market_ai", "time_decay",
     "panic_move", "high_prob_bond", "liquidity_shift",
     "chainlink_edge",
+    # Paper-trade strategies (see _PAPER_STRATEGIES below) — still listed so
+    # strategy_tool picks them up.
+    "smart_money",
 ]
+
+# Paper-trade list: these strategies RUN (signals are logged and "virtually
+# executed") but never place a real order. Used to collect performance data
+# for unproven strategies before promoting them to real trading.
+_PAPER_STRATEGIES = {"smart_money"}
+
+
+def is_paper_strategy(name: str) -> bool:
+    """engine.py consults this to decide whether to place a real order."""
+    return name in _PAPER_STRATEGIES
 _REVERSE_STRATEGIES = [
     "probability_freeze", "liquidity_vacuum", "crowd_fatigue",
     "whale_exhaustion", "fake_momentum", "event_shadow_drift",
@@ -85,12 +98,15 @@ def run_strategies(
                 result = mod.detect(markets)
             # Apply weight: multiply each signal's score (capped at 100)
             w = get_weight(name)
-            if w != 1.0:
-                for sig in result:
-                    try:
+            is_paper = name in _PAPER_STRATEGIES
+            for sig in result:
+                try:
+                    if w != 1.0:
                         sig["score"] = min(100.0, float(sig.get("score", 0)) * w)
-                    except Exception:
-                        pass
+                    if is_paper:
+                        sig["paper_trade"] = True
+                except Exception:
+                    pass
             elapsed = round(time.time() - t0, 3)
             logger.info(
                 "strategy_tool.run",

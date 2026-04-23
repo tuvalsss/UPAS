@@ -371,16 +371,31 @@ def run_pipeline(
                 "equity": eq,
             })
 
-            order_result = place_order(
-                exchange=source,
-                market_id=mid,
-                side=side,
-                price=float(price),
-                size_usd=size_usd,
-                ticker=ticker,
-                token_id=token_id,
-                current_exposure_usd=0.0,
-            )
+            # Paper-trade mode: strategy is under evaluation. Record a virtual
+            # fill at market price but never call the exchange.
+            is_paper = bool(sig.get("paper_trade"))
+            if is_paper:
+                order_result = {
+                    "order_id": str(uuid.uuid4()),
+                    "status": "paper",
+                    "exchange_order_id": "",
+                    "error": None,
+                }
+                logger.info("engine.execute.paper", extra={
+                    "market_id": mid, "side": side, "price": float(price),
+                    "size_usd": size_usd, "strategy": sig.get("strategy_name"),
+                })
+            else:
+                order_result = place_order(
+                    exchange=source,
+                    market_id=mid,
+                    side=side,
+                    price=float(price),
+                    size_usd=size_usd,
+                    ticker=ticker,
+                    token_id=token_id,
+                    current_exposure_usd=0.0,
+                )
 
             order_rec = {
                 "order_id": order_result.get("order_id", str(uuid.uuid4())),
@@ -393,6 +408,7 @@ def run_pipeline(
                 "status": order_result.get("status", "unknown"),
                 "exchange_order_id": order_result.get("exchange_order_id", ""),
                 "dry_run": DRY_RUN,
+                "paper_trade": 1 if is_paper else 0,
                 "error": order_result.get("error"),
                 "timestamp": _now(),
             }
