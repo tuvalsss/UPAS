@@ -20,6 +20,7 @@ Commands:
   errors [n]           last N errors from log
   ask <question>       ask Claude a free-form question about the system
   scorecard            per-strategy realized win-rate + adaptive weights
+  pnl [hours]          portfolio curve + realized PnL + live unrealized (default 24h)
   track                force one outcome-tracker pass (normally every 30 min)
   train                train ML re-ranker on accumulated outcomes
   propose              ask Claude to propose a new strategy (>=500 outcomes needed)
@@ -355,6 +356,82 @@ def cmd_track_once(_):
     console.print(Panel(json.dumps(r, indent=2), title="Outcome Tracker", border_style="cyan"))
 
 
+def cmd_pnl(args):
+    """Portfolio curve + realized PnL + current unrealized PnL."""
+    from core.strategy_scorecard import grand_total
+    from tools.account_tool import get_polymarket_positions
+    from tools.database_tool import _conn
+
+    hours = int(args[0]) if args else 24
+    with _conn() as con:
+        first = con.execute(
+            "SELECT snapshot_at, total_value_usd FROM balances "
+            "WHERE exchange='polymarket' AND snapshot_at>=datetime('now', ?) "
+            "ORDER BY snapshot_at ASC LIMIT 1", (f"-{hours} hours",),
+        ).fetchone()
+        latest = con.execute(
+            "SELECT snapshot_at, total_value_usd FROM balances "
+            "WHERE exchange='polymarket' ORDER BY snapshot_at DESC LIMIT 1"
+        ).fetchone()
+        k_first = con.execute(
+            "SELECT total_value_usd FROM balances "
+            "WHERE exchange='kalshi' AND snapshot_at>=datetime('now', ?) "
+            "ORDER BY snapshot_at ASC LIMIT 1", (f"-{hours} hours",),
+        ).fetchone()
+        k_latest = con.execute(
+            "SELECT total_value_usd FROM balances "
+            "WHERE exchange='kalshi' ORDER BY snapshot_at DESC LIMIT 1"
+        ).fetchone()
+
+    p_then = first[1] if first else None
+    p_now = latest[1] if latest else None
+    k_then = k_first[0] if k_first else None
+    k_now = k_latest[0] if k_latest else None
+
+    if all(v is not None for v in [p_then, p_now, k_then, k_now]):
+        then_total = p_then + k_then
+        now_total = p_now + k_now
+        delta = now_total - then_total
+        pct = (delta / then_total * 100) if then_total else 0
+        color = "green" if delta >= 0 else "red"
+        console.print(Panel(
+            f"Period: last {hours}h\n"
+            f"Then : Poly ${p_then:.2f} + Kalshi ${k_then:.2f} = [bold]${then_total:.2f}[/]\n"
+            f"Now  : Poly ${p_now:.2f} + Kalshi ${k_now:.2f} = [bold]${now_total:.2f}[/]\n"
+            f"Delta: [{color}]${delta:+.2f} ({pct:+.2f}%)[/]",
+            title=f"Portfolio Curve", border_style=color,
+        ))
+    else:
+        console.print("[yellow]not enough balance history yet[/]")
+
+    # Realized PnL from outcomes
+    gt = grand_total()
+    console.print(Panel(
+        f"Realized trades: {gt['trades']}  W/L: {gt['wins']}/{gt['losses']}  "
+        f"Win rate: {gt['win_rate']*100:.1f}%  "
+        f"Total realized: ${gt['total_pnl_usd']:+.2f}",
+        title="Realized P&L (from outcome tracker)",
+        border_style="green" if gt['total_pnl_usd'] >= 0 else "red",
+    ))
+
+    # Live unrealized PnL on Polymarket
+    p = get_polymarket_positions()
+    unreal = 0.0
+    winners = losers = 0
+    for pos in p.get("positions", []):
+        pnl = pos.get("unrealized_pnl_usd", 0) or 0
+        unreal += pnl
+        if pnl > 0: winners += 1
+        elif pnl < 0: losers += 1
+    console.print(Panel(
+        f"Open positions: {p.get('position_count', 0)}\n"
+        f"Winners: {winners}  Losers: {losers}\n"
+        f"Unrealized PnL: ${unreal:+.2f}",
+        title="Live Unrealized P&L (Polymarket)",
+        border_style="green" if unreal >= 0 else "red",
+    ))
+
+
 def cmd_help(_):
     console.print(Panel(__doc__ or "(no help)", title="UPAS CLI", border_style="bright_blue"))
 
@@ -365,7 +442,7 @@ COMMANDS = {
     "run": cmd_run, "force-scan": cmd_force_scan, "run-strategy": cmd_run_strategy,
     "pause": cmd_pause, "resume": cmd_resume, "close": cmd_close, "errors": cmd_errors,
     "ask": cmd_ask,
-    "scorecard": cmd_scorecard, "track": cmd_track_once,
+    "scorecard": cmd_scorecard, "track": cmd_track_once, "pnl": cmd_pnl,
     "train": lambda _: console.print(__import__("ml.reranker", fromlist=["train"]).train()),
     "propose": lambda _: console.print(__import__("ai.strategy_generator", fromlist=["propose_one"]).propose_one()),
     "help": cmd_help, "?": cmd_help,
