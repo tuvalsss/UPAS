@@ -6,6 +6,7 @@ Scan → Normalize → Strategy → Reverse Strategy → Meta Strategy
 """
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any

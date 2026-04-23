@@ -82,6 +82,10 @@ echo [launcher] starting DASHBOARD window...
 start "UPAS_DASHBOARD" cmd /k ""%PY%" -m tools.dashboard"
 timeout /t 2 /nobreak >nul
 
+echo [launcher] starting POSITION MONITOR window...
+start "UPAS_MONITOR" cmd /k ""%PY%" -m core.position_monitor"
+timeout /t 2 /nobreak >nul
+
 echo.
 echo [launcher] CLI below. Type 'help' or 'exit'.
 echo.
@@ -92,6 +96,7 @@ echo.
 echo [launcher] shutting down (CLI exit %CLI_EXIT%)...
 taskkill /FI "WINDOWTITLE eq UPAS_SCHEDULER*" /T /F >nul 2>&1
 taskkill /FI "WINDOWTITLE eq UPAS_DASHBOARD*" /T /F >nul 2>&1
+taskkill /FI "WINDOWTITLE eq UPAS_MONITOR*" /T /F >nul 2>&1
 echo [launcher] done.
 timeout /t 2 /nobreak >nul
 endlocal

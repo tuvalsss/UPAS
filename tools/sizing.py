@@ -24,7 +24,7 @@ from typing import Literal
 # Read once at import; env can override
 _KELLY_FRACTION = float(os.getenv("KELLY_FRACTION", "0.25"))
 _MAX_TRADE_EQUITY_PCT = float(os.getenv("MAX_TRADE_EQUITY_PCT", "0.08"))
-_MAX_SINGLE_TRADE_USD = float(os.getenv("MAX_SINGLE_TRADE_USD", "25"))
+_MAX_SINGLE_TRADE_USD_BASE = float(os.getenv("MAX_SINGLE_TRADE_USD", "25"))
 _MIN_SIZE_USD_POLY = 5.0   # Polymarket hard floor
 _MIN_SIZE_USD_KALSHI = 1.0 # Kalshi accepts 1c minimums
 
@@ -76,9 +76,13 @@ def kelly_size_usd(
     # Start with Kelly fraction of equity
     size = equity_usd * kelly_applied
 
-    # Caps (tightest wins)
+    # Caps (tightest wins) — cap_single is compound-adjusted from realized profit
     cap_equity = equity_usd * _MAX_TRADE_EQUITY_PCT
-    cap_single = _MAX_SINGLE_TRADE_USD
+    try:
+        from core.compound_state import current_max_single_trade_usd
+        cap_single = current_max_single_trade_usd()
+    except Exception:
+        cap_single = _MAX_SINGLE_TRADE_USD_BASE
     cap_exposure = max(0.0, max_total_exposure_usd - open_exposure_usd)
 
     size_capped = min(size, cap_equity, cap_single, cap_exposure)

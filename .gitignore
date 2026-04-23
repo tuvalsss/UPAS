@@ -14,6 +14,11 @@ secrets/
 .secrets/
 credentials.json
 
+# License keys
+config/license_private.pem
+license.jwt
+licenses/
+
 # ── Python ───────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
