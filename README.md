@@ -21,9 +21,38 @@ START_ALL.bat                  :: opens scheduler + dashboard + CLI; close windo
 |---|---|---|
 | `UPAS_SCHEDULER` | `core.scheduler` | Runs pipeline every 60s |
 | `UPAS_DASHBOARD` | `tools.dashboard` | Live status panels |
-| `UPAS MASTER` (foreground) | `tools.cli` | Interactive REPL — `help`, `status`, `ask`, `orders`, `positions`, etc. |
+| `UPAS_MONITOR` | `core.position_monitor` | Stop-loss (-40%) / take-profit (+80%) every 5 min |
+| `UPAS_TRACKER` | `core.outcome_tracker` | Resolves closed positions, updates adaptive weights every 30 min |
+| `UPAS MASTER` (foreground) | `tools.cli` | Interactive REPL — `help`, `pnl`, `scorecard`, `orders`, `positions`, etc. |
 
-Closing `UPAS MASTER` kills scheduler + dashboard.
+Closing `UPAS MASTER` kills scheduler + dashboard + monitor + tracker.
+
+## CLI commands
+
+```
+status       system health summary
+portfolio    balances (poly + kalshi)
+positions    active positions
+pnl [hours]  portfolio curve + realized + live unrealized P&L
+scorecard    per-strategy win rate + PnL + adaptive weights
+orders [n]   last N orders
+signals [n]  top N signals from last 10 min
+track        force one outcome-tracker pass
+train        train ML re-ranker (needs ≥100 outcomes)
+propose      ask Claude for a new strategy (needs ≥500 outcomes)
+pause/resume pause/resume execute stage
+ask <q>      free-form question to Claude about system state
+```
+
+## Self-improvement pipeline
+
+UPAS learns from its own results:
+
+1. **outcome_tracker** verifies each trade against Polymarket CLOB resolution API and writes PnL to `results` table.
+2. **strategy_scorecard** aggregates per-strategy win rate + PnL.
+3. **strategy_weights** auto-disables strategies with n≥50 and win_rate<35%, boosts strategies with n≥30 and win_rate>55%.
+4. **ml/reranker.py** (scaffold, activates at 100 outcomes) trains XGBoost on signal features → win probability → scales Kelly sizing.
+5. **ai/strategy_generator.py** (scaffold, activates at 500 outcomes) asks Claude to propose new strategies based on gap analysis. Output goes to `strategies/proposed/` for human review — never auto-enabled.
 
 ## Pipeline stages
 

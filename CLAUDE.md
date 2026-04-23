@@ -80,6 +80,11 @@ and after, not feelings.
 
 The system improves incrementally. Do NOT jump stages.
 
+0. **Also available**: `strategies/proposed/smart_money.py` — copy-trade whales
+   via Polymarket public leaderboard API
+   (`https://data-api.polymarket.com/v1/leaderboard`). NOT wired. Needs dry-run
+   validation over ≥50 clusters before promotion. See
+   [docs/strategies/smart-money.md](docs/strategies/smart-money.md) for full plan.
 1. **Current**: Stages 1-3 live, stages 4-5 scaffolded.
 2. **Next once ≥100 realized outcomes (~3-5 days of trading)**:
    - Train reranker. Verify `positive_rate` + `logloss` improvement over
