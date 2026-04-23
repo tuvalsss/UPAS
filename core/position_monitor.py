@@ -27,7 +27,7 @@ logger = get_logger(__name__)
 _STOP_LOSS_PCT = float(os.getenv("STOP_LOSS_PCT", "-0.40"))   # sell if -40% or worse
 _TAKE_PROFIT_PCT = float(os.getenv("TAKE_PROFIT_PCT", "0.80"))  # sell if +80% or better
 _INTERVAL = int(os.getenv("MONITOR_INTERVAL_SEC", "300"))
-_MIN_POS_VALUE = float(os.getenv("MONITOR_MIN_VALUE_USD", "1.50"))  # skip dust
+_MIN_POS_VALUE = float(os.getenv("MONITOR_MIN_VALUE_USD", "5.50"))  # Poly min $5 + buffer
 
 
 def _decide(pos: dict) -> tuple[str | None, float]:
@@ -37,10 +37,13 @@ def _decide(pos: dict) -> tuple[str | None, float]:
     pnl = float(pos.get("unrealized_pnl_usd", 0) or 0)
     value = float(pos.get("value_usd", 0) or 0)
 
-    if value < _MIN_POS_VALUE or avg <= 0 or size <= 0:
+    if avg <= 0 or size <= 0:
         return None, 0.0
     if pos.get("redeemable"):
         return None, 0.0  # already resolved; can't sell
+    # Compute anyway for logging, but skip action if position too small to sell
+    if value < _MIN_POS_VALUE:
+        return None, 0.0
 
     entry_cost = avg * size
     if entry_cost <= 0:
