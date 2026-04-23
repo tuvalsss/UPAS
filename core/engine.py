@@ -344,6 +344,7 @@ def run_pipeline(
             sized = kelly_size_usd(
                 exchange=source, price=float(price), score=score,
                 ai_confidence=ai_conf, equity_usd=eq, open_exposure_usd=open_exp,
+                signal=sig,
             )
             size_usd = sized["size_usd"]
             if size_usd <= 0:

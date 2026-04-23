@@ -19,6 +19,10 @@ Commands:
   close <market_id>    mark position for close (writes close request)
   errors [n]           last N errors from log
   ask <question>       ask Claude a free-form question about the system
+  scorecard            per-strategy realized win-rate + adaptive weights
+  track                force one outcome-tracker pass (normally every 30 min)
+  train                train ML re-ranker on accumulated outcomes
+  propose              ask Claude to propose a new strategy (>=500 outcomes needed)
   help                 this list
   exit / quit          leave REPL
 """
@@ -312,6 +316,45 @@ def cmd_ask(args):
     console.print(Panel(answer or "[dim](empty)[/]", title="Claude", border_style="magenta"))
 
 
+def cmd_scorecard(_):
+    """Per-strategy realized win-rate + PnL + current adaptive weight."""
+    from core.strategy_scorecard import scorecard, grand_total
+    from core.strategy_weights import list_all
+    gt = grand_total()
+    console.print(Panel(
+        f"Trades: [bold]{gt['trades']}[/]    "
+        f"W/L: [green]{gt['wins']}[/]/[red]{gt['losses']}[/]    "
+        f"Win rate: [bold]{gt['win_rate']*100:.1f}%[/]    "
+        f"Total PnL: {'[green]' if gt['total_pnl_usd']>=0 else '[red]'}"
+        f"${gt['total_pnl_usd']:+.2f}[/]",
+        title="Realized Outcomes", border_style="cyan",
+    ))
+    cards = scorecard()
+    weights = {w["strategy"]: w for w in list_all()}
+    t = Table(title="Per-Strategy Scorecard", show_lines=False)
+    for col in ["Strategy", "n", "W/L", "WinRate", "AvgPnL", "TotalPnL", "Weight", "Status"]:
+        t.add_column(col)
+    for c in cards:
+        w = weights.get(c["strategy"], {})
+        weight = w.get("weight", 1.0)
+        enabled = w.get("enabled", True)
+        status = "[red]DISABLED[/]" if not enabled else (f"[green]BOOST×{weight}[/]" if weight > 1.0 else "normal")
+        pnl_color = "green" if c["total_pnl_usd"] >= 0 else "red"
+        t.add_row(
+            c["strategy"], str(c["n"]), f"{c['wins']}/{c['losses']}",
+            f"{c['win_rate']*100:.1f}%", f"${c['avg_pnl_usd']:+.2f}",
+            f"[{pnl_color}]${c['total_pnl_usd']:+.2f}[/]", f"{weight:.2f}", status,
+        )
+    console.print(t)
+
+
+def cmd_track_once(_):
+    """Force a single outcome_tracker pass (usually daemon runs this every 30 min)."""
+    from core.outcome_tracker import run_once
+    r = run_once()
+    console.print(Panel(json.dumps(r, indent=2), title="Outcome Tracker", border_style="cyan"))
+
+
 def cmd_help(_):
     console.print(Panel(__doc__ or "(no help)", title="UPAS CLI", border_style="bright_blue"))
 
@@ -322,6 +365,9 @@ COMMANDS = {
     "run": cmd_run, "force-scan": cmd_force_scan, "run-strategy": cmd_run_strategy,
     "pause": cmd_pause, "resume": cmd_resume, "close": cmd_close, "errors": cmd_errors,
     "ask": cmd_ask,
+    "scorecard": cmd_scorecard, "track": cmd_track_once,
+    "train": lambda _: console.print(__import__("ml.reranker", fromlist=["train"]).train()),
+    "propose": lambda _: console.print(__import__("ai.strategy_generator", fromlist=["propose_one"]).propose_one()),
     "help": cmd_help, "?": cmd_help,
 }
 

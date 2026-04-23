@@ -48,6 +48,7 @@ def kelly_size_usd(
     equity_usd: float,
     open_exposure_usd: float = 0.0,
     max_total_exposure_usd: float = 2000.0,
+    signal: dict | None = None,
 ) -> dict:
     """
     Compute position size for one order.
@@ -64,6 +65,24 @@ def kelly_size_usd(
         return {"size_usd": 0.0, "reason": "no equity", "inputs": locals()}
 
     edge = _expected_edge(score, ai_confidence)
+    # ML re-ranker overlay: if we have enough trained outcomes, use the
+    # model's predicted win probability to scale the edge up/down.
+    ml_prob = None
+    if signal is not None:
+        try:
+            from ml.reranker import predict_win_prob
+            ml_prob = predict_win_prob({
+                "score": score, "confidence": ai_confidence,
+                "entry_price": price, "size_usd": 0,
+                "strategy": signal.get("strategy_name", signal.get("strategy", "unknown")),
+            })
+        except Exception:
+            ml_prob = None
+    if ml_prob is not None:
+        # Market-implied win prob ≈ price (for YES buys at price p, winning pays 1-p on the winner-side).
+        # Edge multiplier = ml_prob / price, clipped to [0.5, 2.0] so bad model = shrink, good = boost.
+        mult = max(0.5, min(2.0, ml_prob / max(0.02, price)))
+        edge = edge * mult
     if edge <= 0:
         return {"size_usd": 0.0, "reason": "edge<=0", "inputs": locals()}
 

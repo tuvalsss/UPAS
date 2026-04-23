@@ -63,7 +63,19 @@ def run_strategies(
 
     signals: list[dict[str, Any]] = []
 
+    # Adaptive layer: skip strategies that have been auto-disabled by the
+    # outcome tracker (poor win rate on realized trades). Never blocks a new
+    # strategy with no history.
+    try:
+        from core.strategy_weights import is_enabled, get_weight
+    except Exception:
+        is_enabled = lambda _n: True  # noqa: E731
+        get_weight = lambda _n: 1.0   # noqa: E731
+
     for name in names:
+        if not is_enabled(name):
+            logger.info("strategy_tool.skip_disabled", extra={"strategy": name})
+            continue
         t0 = time.time()
         try:
             mod = _load_strategy(pkg, name)
@@ -71,6 +83,14 @@ def run_strategies(
                 result = mod.detect(markets, all_signals or [])
             else:
                 result = mod.detect(markets)
+            # Apply weight: multiply each signal's score (capped at 100)
+            w = get_weight(name)
+            if w != 1.0:
+                for sig in result:
+                    try:
+                        sig["score"] = min(100.0, float(sig.get("score", 0)) * w)
+                    except Exception:
+                        pass
             elapsed = round(time.time() - t0, 3)
             logger.info(
                 "strategy_tool.run",
@@ -78,6 +98,7 @@ def run_strategies(
                     "strategy": name,
                     "type": strategy_type,
                     "signals": len(result),
+                    "weight": w,
                     "elapsed_s": elapsed,
                 },
             )
