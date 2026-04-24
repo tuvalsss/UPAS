@@ -58,21 +58,28 @@ def _filter_markets(markets: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for m in markets:
         yes = m.get("yes_price", 0.0)
         liq = m.get("liquidity", 0.0)
-        if not (YES_PRICE_MIN <= yes <= YES_PRICE_MAX):
+        # High-prob bond markets (YES > YES_PRICE_MAX) pass through if they have
+        # enough liquidity — high_prob_bond strategy captures them.
+        is_high_prob = yes > YES_PRICE_MAX
+        if not (YES_PRICE_MIN <= yes <= 0.99):
             continue
-        if liq < LIQUIDITY_MIN:
+        if liq < (LIQUIDITY_MIN if not is_high_prob else 200.0):
             continue
         expiry = m.get("expiry_timestamp", "")
         min_hours = float(os.getenv("EXPIRY_HOURS_MIN", "2"))
-        # Block "Up or Down" 5-min crypto window markets even if expiry_timestamp is empty.
-        # These drove 91% loss rate on chainlink_edge — always filter regardless.
+        # Block ALL "Up or Down" window markets — 91% loss rate regardless of asset.
         title = (m.get("title") or "").lower()
-        if "up or down" in title and ("bitcoin" in title or "eth" in title
-                                       or "btc" in title or "crypto" in title):
+        if "up or down" in title:
             continue
         if expiry:
             try:
-                exp_dt = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+                # Handle date-only format "2026-04-24" by appending end-of-day time
+                exp_str = expiry.replace("Z", "+00:00")
+                if "T" not in exp_str and len(exp_str) == 10:
+                    exp_str += "T23:59:59+00:00"
+                exp_dt = datetime.fromisoformat(exp_str)
+                if exp_dt.tzinfo is None:
+                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
                 hours = (exp_dt - now).total_seconds() / 3600
                 if hours > EXPIRY_HOURS_MAX or hours < 0:
                     continue
