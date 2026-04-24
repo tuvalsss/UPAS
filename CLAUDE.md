@@ -65,6 +65,23 @@ Small, measurable changes with a clear hypothesis about P&L impact. One
 commit per logical fix. Push to `github.com/tuvalsss/UPAS` after local
 verification. CI runs `ruff` + import sanity + gitleaks on every push.
 
+## 2a. AI Provider Fallback
+
+The `_call_claude()` function in `ai/scorer.py` is the single entry point for
+all LLM calls (scoring + JSON generation). Routing:
+
+1. If `LLM_LOCAL_ONLY=1` → always local Ollama, never touch Claude.
+2. Else try Claude API (if key + `CLAUDE_AUTH_MODE=api`).
+3. Else fallback to local Ollama at `OLLAMA_BASE_URL` (default http://localhost:11434).
+4. If both fail → return "" and caller uses rule-based score.
+
+**Local models** (pulled via `ollama pull <name>`):
+- `qwen2.5:7b-instruct` (primary, B/A tier) — 4.7GB RAM, ~3s warm latency, best 7B for JSON.
+- `phi3:mini` (C/fast tier) — 2.2GB RAM, ~2.6s warm, good for bulk bulk scoring.
+
+Ollama must be running (`ollama serve` — auto-starts on Windows install).
+Local fallback verified working: force-fail Claude → Ollama returns a scored integer in ~3s.
+
 ## 3. Non-Negotiables
 
 - **Never commit secrets.** `.env`, `config/*.pem`, `license_private.pem`,

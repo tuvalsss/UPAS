@@ -40,11 +40,25 @@ def _tier_model(tier: str) -> str:
 
 def _call_claude(prompt: str, model: str | None = None, tier: str = "B") -> str:
     """
-    Call Claude API or use CLI auth depending on CLAUDE_AUTH_MODE.
-    Returns response text or empty string on failure.
+    Call Claude API, with local Ollama LLM as fallback.
+    Routing:
+      - LLM_LOCAL_ONLY=1 -> always local, never touch Claude
+      - CLAUDE_AUTH_MODE=api + key set -> try Claude first, fallback to local
+      - otherwise (user mode) -> try local directly
+    Returns "" on complete failure.
     """
     if not AI_ENABLED:
         return ""
+
+    from ai import local_llm
+
+    # Fast path: local-only
+    if local_llm.local_only():
+        return local_llm.call(
+            prompt, tier=tier,
+            system=("You are a prediction market analyst. "
+                    "When asked to rate a signal, reply with only an integer 0-100."),
+        )
 
     effective_model = model or _tier_model(tier)
 
@@ -67,13 +81,23 @@ def _call_claude(prompt: str, model: str | None = None, tier: str = "B") -> str:
                 ],
                 messages=[{"role": "user", "content": prompt}],
             )
-            return msg.content[0].text if msg.content else ""
+            if msg.content:
+                return msg.content[0].text
         except Exception as e:
-            logger.error("scorer.claude_api_error", extra={"error": str(e)})
-            return ""
+            logger.warning("scorer.claude_api_error_fallback_local",
+                           extra={"error": str(e)})
 
-    # CLAUDE_AUTH_MODE=user: Claude CLI not called directly from Python scorer
-    # Scorer uses rule-based scoring in user mode (Claude is called via subagents)
+    # Local fallback — covers both "Claude failed" and "user mode without CLI"
+    if local_llm.is_available():
+        r = local_llm.call(
+            prompt, tier=tier,
+            system=("You are a prediction market analyst. "
+                    "When asked to rate a signal, reply with only an integer 0-100."),
+        )
+        if r:
+            logger.info("scorer.local_fallback_used", extra={"tier": tier})
+            return r
+
     return ""
 
 
