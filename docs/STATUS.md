@@ -2,13 +2,33 @@
 aliases: [UPAS Status, Profitability, System Truth]
 tags: [status, profitability, cto-review]
 type: operational
-updated: 2026-04-23
-related: [[HOME]], [[architecture/overview]], [[strategies/INDEX]]
+updated: 2026-04-24
+related: [[HOME]], [[architecture/overview]], [[pipeline/flow]], [[strategies/INDEX]]
 ---
 
 # UPAS — Current System State (CTO Review)
 
-> Snapshot: **2026-04-23**. This doc tracks reality, not aspiration.
+> Snapshot: **2026-04-24**. This doc tracks reality, not aspiration.
+
+## Live vs scaffold
+
+| Component | State | Notes |
+|---|---|---|
+| scan / normalize / strategies / reverse / AI score / alert / execute | ✅ **live** | see [[pipeline/flow]] |
+| Chainlink stream | ✅ live | WebSocket thread inside scheduler window |
+| Tier routing (REAL / PAPER-near-miss / PAPER-proposed) | ✅ live | env: `PAPER_MIN_SCORE`, `PAPER_MIN_CONF` |
+| Kelly sizing + compound state | ✅ live | `tools/sizing.py` + `core/compound_state.py` |
+| Position monitor (SL/TP) | ✅ live | 5-min loop, separate window |
+| Outcome tracker (real + paper resolution) | ✅ live | 30-min loop, CLOB API resolution |
+| Strategy scorecard + adaptive weights | ✅ live | auto-disable <35% WR, boost >55% |
+| Threshold tuner | ✅ advisory | `upas> tune` shows suggestions |
+| Wallet registry (smart money cross-reference) | ✅ live | refreshes lazily every 6h |
+| Smart money strategy | ✅ paper-only | promotes to real after 50 paper trades ≥55% WR |
+| ML re-ranker (XGBoost) | ⚠️ scaffold | trains at ≥100 realized outcomes |
+| Strategy generator (Claude-proposed) | ⚠️ scaffold | runs at ≥500 realized outcomes |
+| question_router interactive loop | ❌ skipped in live | blocks the bot — logged instead. intentional. |
+| RL policy auto-update | ❌ replaced | `strategy_weights` does the job for now |
+| tool-discovery-agent in pipeline | ❌ not called | dev-time skill, not runtime |
 
 ## Scanner throughput (live, 24h)
 
