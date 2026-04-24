@@ -238,12 +238,36 @@ def run_pipeline(
     if AUTO_EXECUTE:
         from tools.execution_tool import place_order
 
-        # Candidate signals: score + confidence threshold
-        candidates = [
-            s for s in ranked
-            if s.get("combined_score", 0) >= MIN_SIGNAL_SCORE
-            and s.get("confidence", 0) >= MIN_CONFIDENCE_EXEC
-        ]
+        # Tier routing: REAL, NEAR-MISS PAPER, or discard.
+        #   REAL:       score >= MIN_SIGNAL_SCORE       AND conf >= MIN_CONFIDENCE_EXEC
+        #   PAPER:      score in [PAPER_MIN_SCORE, REAL) AND conf >= PAPER_MIN_CONF
+        #   (also:     any signal from strategy in _PAPER_STRATEGIES -> PAPER)
+        # Paper trades cost nothing but produce resolution data we use to
+        # learn whether our REAL thresholds are tuned correctly (via the
+        # threshold_tuner). No trades = no feedback.
+        _PAPER_MIN_SCORE = float(os.getenv("PAPER_MIN_SCORE", "60"))
+        _PAPER_MIN_CONF = float(os.getenv("PAPER_MIN_CONF", "0.50"))
+        _PAPER_MAX_PER_CYCLE = int(os.getenv("PAPER_MAX_PER_CYCLE", "5"))
+        from tools.strategy_tool import _PAPER_STRATEGIES
+
+        real_candidates = []
+        paper_candidates = []
+        for s in ranked:
+            score = float(s.get("combined_score", 0) or 0)
+            conf = float(s.get("confidence", 0) or 0)
+            strat = s.get("strategy_name", "")
+            forced_paper = strat in _PAPER_STRATEGIES
+            if score >= MIN_SIGNAL_SCORE and conf >= MIN_CONFIDENCE_EXEC and not forced_paper:
+                real_candidates.append(s)
+            elif forced_paper or (score >= _PAPER_MIN_SCORE and conf >= _PAPER_MIN_CONF):
+                s["paper_trade"] = True
+                # Tag the reason so we can segment in analytics:
+                #   "near_miss" (would have been REAL under looser thresholds)
+                #   "proposed_strategy" (strategy is explicitly PAPER-only)
+                s["paper_reason"] = "proposed_strategy" if forced_paper else "near_miss"
+                paper_candidates.append(s)
+
+        candidates = real_candidates + paper_candidates
 
         # Dedup: skip markets with LIVE filled/pending order in last 2h (short cooldown).
         # 24h was too long — same market kept getting blocked after one trade.
@@ -254,10 +278,15 @@ def run_pipeline(
 
         # Post-Kelly sizing: allow up to 3 orders per cycle (sizes are capped individually)
         max_orders_per_cycle = int(os.getenv("MAX_ORDERS_PER_CYCLE", "3"))
+        paper_placed = 0
 
         for sig in candidates:
-            if orders_placed >= max_orders_per_cycle:
-                break
+            is_paper = bool(sig.get("paper_trade"))
+            # Paper trades don't count against real-order cycle cap
+            if not is_paper and orders_placed >= max_orders_per_cycle:
+                continue
+            if is_paper and paper_placed >= _PAPER_MAX_PER_CYCLE:
+                continue
             mid = sig.get("market_id", "")
             if mid in recent_market_ids:
                 logger.info("engine.execute.skip_duplicate", extra={"market_id": mid})
@@ -427,13 +456,20 @@ def run_pipeline(
                 pass
 
             recent_market_ids.add(mid)
-            orders_placed += 1
+            if is_paper:
+                paper_placed += 1
+            else:
+                orders_placed += 1
             logger.info("engine.execute.order", extra={
                 "market_id": mid, "side": side, "status": order_rec["status"],
-                "dry_run": DRY_RUN,
+                "dry_run": DRY_RUN, "paper": is_paper,
+                "paper_reason": sig.get("paper_reason"),
             })
 
-        logger.info("engine.execute.done", extra={"orders_placed": orders_placed, "dry_run": DRY_RUN})
+        logger.info("engine.execute.done", extra={
+            "orders_placed": orders_placed, "paper_placed": paper_placed,
+            "dry_run": DRY_RUN,
+        })
     else:
         logger.debug("engine.execute.disabled", extra={"auto_execute": False})
 

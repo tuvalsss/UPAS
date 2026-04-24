@@ -16,8 +16,19 @@ before starting work — never rebuild a stage that already exists.
 | 1. Outcome tracker | `core/outcome_tracker.py` | ✅ built | n/a |
 | 2. Strategy scorecard | `core/strategy_scorecard.py` | ✅ built | n/a |
 | 3. Adaptive weights | `core/strategy_weights.py` | ✅ built, live | n/a |
+| 3b. Near-miss paper routing | `core/engine.py` (tier logic) | ✅ built, live | `PAPER_MIN_SCORE`, `PAPER_MIN_CONF` |
+| 3c. Threshold tuner | `core/threshold_tuner.py` | ✅ built (advisory) | n/a |
 | 4. ML re-ranker (XGBoost) | `ml/reranker.py` | ⚠️ scaffold, needs ≥100 outcomes to train | `RERANKER_MIN_SAMPLES` |
 | 5. AI strategy generator | `ai/strategy_generator.py` | ⚠️ scaffold, needs ≥500 outcomes | `STRATEGY_GEN_MIN_OUTCOMES` |
+
+### Signal tier routing
+Every signal is classified at engine.execute time:
+- **REAL**   — score ≥ `MIN_SIGNAL_SCORE` AND conf ≥ `MIN_CONFIDENCE_EXEC` → real order.
+- **PAPER (near-miss)** — score in [`PAPER_MIN_SCORE`, real-threshold) AND conf ≥ `PAPER_MIN_CONF` → virtual order, logged + resolved but no exchange contact.
+- **PAPER (proposed-strategy)** — any strategy in `tools/strategy_tool._PAPER_STRATEGIES` (e.g. `smart_money`) → always paper regardless of score.
+- **DISCARDED** — everything else.
+
+Paper orders write to `orders` with `paper_trade=1, status='paper'`. Outcome tracker resolves them the same way as real orders. Scorecard reports them in a separate panel. `threshold_tuner` mines score-bucket performance across both tiers to suggest MIN_SIGNAL_SCORE changes.
 
 The tracker daemon is `UPAS_TRACKER` window (launched by `START_ALL.bat`).
 It runs every 30 min, writes to `results` table, then calls

@@ -22,6 +22,7 @@ Commands:
   scorecard            per-strategy realized win-rate + adaptive weights
   pnl [hours]          portfolio curve + realized PnL + live unrealized (default 24h)
   track                force one outcome-tracker pass (normally every 30 min)
+  tune                 score-bucket performance + suggested threshold changes
   train                train ML re-ranker on accumulated outcomes
   propose              ask Claude to propose a new strategy (>=500 outcomes needed)
   help                 this list
@@ -442,6 +443,29 @@ def cmd_pnl(args):
     ))
 
 
+def _show_tune():
+    """Show threshold tuner output: per-score-bucket win rates + suggestions."""
+    from core.threshold_tuner import suggest_thresholds
+    s = suggest_thresholds()
+    t = Table(title="Score-Bucket Performance (real + paper)")
+    for col in ["Score", "N", "W/L", "WinRate", "TotalPnL"]:
+        t.add_column(col)
+    for b in s["buckets"]:
+        wr = b["win_rate"] * 100
+        pnl_col = "green" if b["total_pnl_usd"] >= 0 else "red"
+        t.add_row(b["score_bucket"], str(b["n"]),
+                  f"{b['wins']}/{b['losses']}", f"{wr:.1f}%",
+                  f"[{pnl_col}]${b['total_pnl_usd']:+.2f}[/]")
+    console.print(t)
+    for note in s["notes"]:
+        console.print(f"  [cyan]*[/] {note}")
+    if s["suggested_min_score"]:
+        console.print(
+            f"\n  [bold green]-> suggested MIN_SIGNAL_SCORE: "
+            f"{s['suggested_min_score']}[/]"
+        )
+
+
 def cmd_help(_):
     console.print(Panel(__doc__ or "(no help)", title="UPAS CLI", border_style="bright_blue"))
 
@@ -453,6 +477,7 @@ COMMANDS = {
     "pause": cmd_pause, "resume": cmd_resume, "close": cmd_close, "errors": cmd_errors,
     "ask": cmd_ask,
     "scorecard": cmd_scorecard, "track": cmd_track_once, "pnl": cmd_pnl,
+    "tune": lambda _: _show_tune(),
     "train": lambda _: console.print(__import__("ml.reranker", fromlist=["train"]).train()),
     "propose": lambda _: console.print(__import__("ai.strategy_generator", fromlist=["propose_one"]).propose_one()),
     "help": cmd_help, "?": cmd_help,
