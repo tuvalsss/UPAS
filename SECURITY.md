@@ -28,6 +28,45 @@ UPAS is a **local-only** trading agent. It runs on your Windows machine, reads y
 
 **Recommendation**: full-disk encryption (BitLocker) on the machine running UPAS.
 
+## License System (optional, for commercial distribution)
+
+UPAS ships with an **offline RS256 JWT license system** that lets the owner (you) sell licenses and revoke them. Key facts:
+
+- **Signing key** (`config/license_private.pem`) is **gitignored** — only you have it. Anyone with this file can mint licenses.
+- **Public key** (`config/license_public.pem`) **is committed** — clients use it to verify licenses offline (no network call).
+- **License generator** (`tools/issue_license.py`) is **gitignored** — even the script that makes licenses is not shipped. Your git repo never contains the ability to mint licenses.
+- **Revocation list** (`config/revoked_jti.txt`) **is committed** — when you revoke a customer, you push an updated list; clients who `git pull` pick it up.
+- **Ledger** (`licenses/ledger.jsonl`) **is gitignored** — admin's private record of who bought what, when.
+
+### Admin flow (one-time)
+```bash
+# first run creates both pems + ledger + admin license
+python -m tools.issue_license --email you@example.com --plan admin --lifetime --out license.jwt
+
+# issue a 30-day pro customer
+python -m tools.issue_license --email customer@x.com --plan pro --days 30 \
+    --out licenses/customer.jwt --note "paid $50 via stripe"
+
+# see everything you've issued
+python -m tools.issue_license --list
+
+# revoke by jti (kills that one license)
+python -m tools.issue_license --revoke <jti>
+git add config/revoked_jti.txt && git commit -m "revoke X" && git push
+```
+
+### Client flow
+1. Customer clones/downloads UPAS from GitHub (public key + revocation list included).
+2. Customer puts their `license.jwt` (from you) at project root.
+3. Customer sets `LICENSE_REQUIRED=1` in `.env`.
+4. On `START_ALL.bat`, scheduler calls `license_guard.guard_or_exit()` — valid license → runs; invalid/expired/revoked → exits with clear message.
+
+### Plans (enforced by `claims.feat`)
+- `free` — scan + dashboard only
+- `pro` — full live trading + AI + smart_money
+- `lifetime` — pro forever
+- `admin` — full access + `issue_licenses` feature + wildcard `*` (yours)
+
 ## Reporting a Vulnerability
 
 If you find a security issue:

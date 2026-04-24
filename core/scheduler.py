@@ -144,6 +144,21 @@ def run_continuous(
 
 if __name__ == "__main__":
     import argparse
+
+    # License gate — runs before the loop starts. If LICENSE_REQUIRED=1 and
+    # license.jwt is invalid/expired/revoked, the process exits non-zero.
+    # Default (LICENSE_REQUIRED=0) logs a WARN and continues — open-source mode.
+    try:
+        from core.license_guard import guard_or_exit
+        lic = guard_or_exit()
+        logger.info("scheduler.license_ok", extra={
+            "email": lic.get("email"), "plan": lic.get("plan"),
+            "is_admin": lic.get("is_admin", False),
+            "expiry": lic.get("expiry"),
+        })
+    except Exception as _e:
+        logger.warning("scheduler.license_check_error", extra={"error": str(_e)})
+
     p = argparse.ArgumentParser(description="UPAS continuous scheduler")
     p.add_argument("--verbose", action="store_true")
     p.add_argument("--strict", action="store_true")

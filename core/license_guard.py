@@ -57,12 +57,26 @@ def verify() -> dict:
     if exp and datetime.fromtimestamp(exp, timezone.utc) < datetime.now(timezone.utc):
         return _fail(f"license expired on {datetime.fromtimestamp(exp, timezone.utc).date()}")
 
+    # Revocation check — the admin can publish config/revoked_jti.txt and any
+    # license whose jti appears there stops validating.
+    jti = claims.get("jti", "")
+    revoked_path = Path(os.getenv("LICENSE_REVOKED_PATH", "config/revoked_jti.txt"))
+    if jti and revoked_path.exists():
+        try:
+            revoked = {line.strip() for line in revoked_path.read_text().splitlines() if line.strip()}
+            if jti in revoked:
+                return _fail(f"license revoked (jti={jti[:8]}...)")
+        except Exception:
+            pass
+
     return {
         "ok": True,
         "email": claims.get("sub", "unknown"),
         "plan": claims.get("plan", "pro"),
         "expiry": datetime.fromtimestamp(exp, timezone.utc).isoformat() if exp else None,
         "features": claims.get("feat", []),
+        "is_admin": claims.get("plan") == "admin" or "*" in (claims.get("feat") or []),
+        "jti": jti,
         "reason": "valid",
     }
 

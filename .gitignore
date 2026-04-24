@@ -5,6 +5,8 @@
 *.env
 config/kalshi_private_key.pem
 *.pem
+# Exception: license PUBLIC key MUST ship with the app so clients can verify
+!config/license_public.pem
 *.key
 *.p12
 *.pfx
@@ -18,6 +20,9 @@ credentials.json
 config/license_private.pem
 license.jwt
 licenses/
+# License generator — never publish. Anyone with this file + the private PEM
+# can mint valid licenses. Ship only tools/license_tool.py (verify/list) to users.
+tools/issue_license.py
 
 # ── Python ───────────────────────────────────────────────────
 __pycache__/
