@@ -31,7 +31,7 @@ _CORE_STRATEGIES = [
 # Paper-trade list: these strategies RUN (signals are logged and "virtually
 # executed") but never place a real order. Used to collect performance data
 # for unproven strategies before promoting them to real trading.
-_PAPER_STRATEGIES = {"smart_money"}
+_PAPER_STRATEGIES = {"smart_money", "yes_no_imbalance", "chainlink_edge"}
 
 
 def is_paper_strategy(name: str) -> bool:

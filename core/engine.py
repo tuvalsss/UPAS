@@ -64,6 +64,12 @@ def _filter_markets(markets: list[dict[str, Any]]) -> list[dict[str, Any]]:
             continue
         expiry = m.get("expiry_timestamp", "")
         min_hours = float(os.getenv("EXPIRY_HOURS_MIN", "2"))
+        # Block "Up or Down" 5-min crypto window markets even if expiry_timestamp is empty.
+        # These drove 91% loss rate on chainlink_edge — always filter regardless.
+        title = (m.get("title") or "").lower()
+        if "up or down" in title and ("bitcoin" in title or "eth" in title
+                                       or "btc" in title or "crypto" in title):
+            continue
         if expiry:
             try:
                 exp_dt = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
@@ -71,8 +77,6 @@ def _filter_markets(markets: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 if hours > EXPIRY_HOURS_MAX or hours < 0:
                     continue
                 # Skip sub-N-hour markets — too short to do anything but gamble.
-                # These are the Bitcoin/ETH "Up/Down 15-min window" crypto flips
-                # that have no real edge once spread+fees are accounted for.
                 if hours < min_hours:
                     continue
             except Exception:

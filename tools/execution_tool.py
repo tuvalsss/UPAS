@@ -45,7 +45,8 @@ _MAX_POSITION_USD = 100.0           # max exposure per market
 _MAX_TOTAL_EXPOSURE_USD = 250.0     # max total portfolio exposure
 _MIN_PRICE = 0.02                   # min price (2¢)
 _MAX_PRICE = 0.98                   # max price (98¢)
-_MIN_SIZE_USD = 5.00                # min order size ($5 — Polymarket exchange floor)
+_MIN_SIZE_USD_POLY = 5.00           # Polymarket exchange floor
+_MIN_SIZE_USD_KALSHI = 1.00         # Kalshi exchange floor
 
 
 # ── Order record schema ───────────────────────────────────────
@@ -90,8 +91,9 @@ def _validate_order(
     """
     violations: list[str] = []
 
-    if size_usd < _MIN_SIZE_USD:
-        violations.append(f"size ${size_usd:.2f} below minimum ${_MIN_SIZE_USD:.2f}")
+    min_size = _MIN_SIZE_USD_KALSHI if exchange == "kalshi" else _MIN_SIZE_USD_POLY
+    if size_usd < min_size:
+        violations.append(f"size ${size_usd:.2f} below minimum ${min_size:.2f}")
     if size_usd > _MAX_SINGLE_TRADE_USD:
         violations.append(f"size ${size_usd:.2f} exceeds hard cap ${_MAX_SINGLE_TRADE_USD:.2f}")
     if not (_MIN_PRICE <= price <= _MAX_PRICE):

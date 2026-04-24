@@ -29,7 +29,7 @@ from tools.database_tool import _conn
 
 logger = get_logger(__name__)
 
-_AUTO_DISABLE_MIN_N = int(os.getenv("AUTO_DISABLE_MIN_N", "50"))
+_AUTO_DISABLE_MIN_N = int(os.getenv("AUTO_DISABLE_MIN_N", "20"))
 _AUTO_DISABLE_WR = float(os.getenv("AUTO_DISABLE_WR", "0.35"))
 _BOOST_MIN_N = int(os.getenv("BOOST_MIN_N", "30"))
 _BOOST_WR = float(os.getenv("BOOST_WR", "0.55"))
